@@ -35,3 +35,7 @@ pytest
 httpx
 
 pydantic-settings
+
+pypdf
+
+chroma-hnswlib
