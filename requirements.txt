@@ -33,3 +33,5 @@ pydantic
 # ── 测试 ──
 pytest
 httpx
+
+pydantic-settings
