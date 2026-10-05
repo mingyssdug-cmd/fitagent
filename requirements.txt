@@ -1,0 +1,35 @@
+# ── 核心：LangChain / LangGraph ──
+langchain==1.4.2
+langgraph==1.2.12
+langchain-community
+langchain-text-splitters
+langchain-chroma
+
+# ── 模型接入 ──
+langchain-openai
+
+# ── Web 框架 ──
+fastapi
+uvicorn[standard]
+
+# ── 数据库 ──
+sqlalchemy
+pymysql
+
+# ── 缓存 ──
+redis
+
+# ── 配置管理 ──
+python-dotenv
+
+# ── 认证 ──
+passlib[bcrypt]
+python-jose[cryptography]
+bcrypt==4.0.1
+
+# ── 数据校验 ──
+pydantic
+
+# ── 测试 ──
+pytest
+httpx
