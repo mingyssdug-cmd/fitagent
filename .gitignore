@@ -24,4 +24,4 @@ chroma_db/
 
 # ── 日志 ──
 *.log
-logs/
+logs/data/checkpoints.db
