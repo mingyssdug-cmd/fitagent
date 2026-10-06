@@ -39,3 +39,5 @@ pydantic-settings
 pypdf
 
 chroma-hnswlib
+
+langgraph-checkpoint-sqlite
