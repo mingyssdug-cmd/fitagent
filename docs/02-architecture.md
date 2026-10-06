@@ -145,7 +145,7 @@ text
 | 文件 | 职责 |
 |---|---|
 | `base.py` | SQLAlchemy Base 定义、引擎、Session |
-| `user.py` | User 模型（认证信息） |
+| `users.py` | User 模型（认证信息） |
 | `profile.py` | Profile 模型（档案信息） |
 | `profile.py` | Plan 模型（历史计划） |
 
@@ -162,7 +162,7 @@ text
 | 文件 | 职责 |
 |---|---|
 | `auth.py` | 注册、登录的请求/响应模型 |
-| `user.py` | 用户档案的请求/响应模型 |
+| `users.py` | 用户档案的请求/响应模型 |
 | `profile.py` | 计划相关的请求/响应模型 |
 | `common.py` | 通用响应格式（如 `{"code": 0, "data": ...}`） |
 
