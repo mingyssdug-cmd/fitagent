@@ -10,7 +10,7 @@ Profile 模型：用户档案信息。
 - profiles.user_id 加 UNIQUE，保证一个用户一份档案
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
 
@@ -49,12 +49,12 @@ class Profile(Base):
     injuries = Column(Text, nullable=True)
 
     # ── 时间戳 ──
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,   # 每次 update 自动更新时间
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),   # 每次 update 自动更新时间
     )
 
     def to_dict(self) -> dict:

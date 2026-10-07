@@ -9,7 +9,7 @@ User 模型：用户认证信息。
 - name 变更频率低，和认证信息一起管理更简单
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, Integer, String, DateTime, SmallInteger
 
@@ -48,7 +48,7 @@ class User(Base):
 
     # ── 时间戳 ──
     last_login_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f"<User id={self.id} phone={self.phone} name={self.name}>"

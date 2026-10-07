@@ -10,7 +10,7 @@
 - 前端只需要判断 code 是否为 0
 """
 
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 

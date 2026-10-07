@@ -9,7 +9,7 @@ Plan 模型：历史计划。
 - goal 字段是"生成时的目标快照"。用户改了目标后，历史计划的语义不变
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Index
 
@@ -46,7 +46,7 @@ class Plan(Base):
     status = Column(String(20), nullable=False, default="completed")
 
     # ── 时间戳 ──
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     # ── 复合索引：按用户查历史并按时间倒序 ──
     __table_args__ = (

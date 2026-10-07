@@ -9,6 +9,7 @@
 ## 1. 架构总览
 
 ### 1.1 四层架构
+```
 ┌──────────────────────────────────────────────────┐
 │ API 层（app/api/） │
 │ 职责：接收 HTTP 请求、参数校验、返回响应 │
@@ -26,7 +27,7 @@
 │ 职责：数据库读写、向量库读写 │
 │ 只关心"数据怎么存取" │
 └──────────────────────────────────────────────────┘
-
+```
 text
 
 ### 1.2 每层职责的边界
@@ -65,6 +66,7 @@ text
 | 任何层直接调 `model.invoke()` | 必须通过 Agent 层封装的接口 |
 
 ### 2.3 依赖方向图
+```
 ┌──────────┐
 │ API 层 │
 └────┬─────┘
@@ -85,8 +87,7 @@ text
 │ Tools │ │ MySQL │
 │ RAG │ │ ChromaDB │
 └────────┘ └──────────┘
-
-text
+```
 
 **箭头方向 = 允许的调用方向。反向调用一律禁止。**
 
@@ -189,6 +190,7 @@ text
 ## 4. 数据流
 
 ### 4.1 用户注册流程
+```
 POST /auth/register
 │
 ▼
@@ -206,10 +208,9 @@ Data 层：user_repo 写入 users 表
 │
 ▼
 API 层：返回 token 和 member_id
-
-text
-
+```
 ### 4.2 生成计划流程
+```
 POST /plans/generate
 │
 ▼
@@ -235,10 +236,10 @@ Agent 层：graph_app 执行
 │
 ▼
 API 层：返回 pending_review + 两份计划
-
-text
+```
 
 ### 4.3 确认计划流程
+```
 POST /plans/{plan_id}/confirm
 │
 ▼
@@ -255,8 +256,7 @@ Data 层：plan_repo 写入 plans 表
 │
 ▼
 API 层：返回最终计划
-
-text
+```
 
 ---
 
@@ -298,28 +298,31 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+```
 其他模块通过 from app.core.config import settings 读取，不直接调 os.getenv()。
 
-6.2 异常处理
+### 6.2 异常处理
 所有自定义异常继承 AppException：
 
-python
+```python
 class AppException(Exception):
     def __init__(self, code: int, message: str):
         self.code = code
         self.message = message
+```
 全局异常处理器（在 main.py 注册）：
 
-python
+```python
 @app.exception_handler(AppException)
 async def app_exception_handler(request, exc):
     return JSONResponse(
         status_code=exc.code,
         content={"code": exc.code, "message": exc.message},
     )
+```
 Service 层抛 AppException，API 层不用写 try/except。
 
-6.3 日志
+### 6.3 日志
 统一用 app/core/logging.py 配置的 logger，不用 print。
 
 日志级别：
@@ -332,7 +335,7 @@ WARNING：可恢复的异常
 
 ERROR：需要关注的错误
 
-6.4 认证
+### 6.4 认证
 JWT 流程：
 
 登录成功 → security.create_token(user_id) 生成 token
@@ -343,10 +346,10 @@ deps.get_current_user() 解析 token → 查数据库 → 返回 User 对象
 
 需要认证的路由参数写 current_user: User = Depends(get_current_user)
 
-6.5 依赖注入
+### 6.5 依赖注入
 FastAPI 的 Depends 机制：
 
-python
+```python
 # app/api/deps.py
 def get_db():
     db = SessionLocal()
@@ -364,17 +367,19 @@ def get_current_user(
 
 def get_settings():
     return settings
+```
 路由里用：
 
-python
+```python
 @router.get("/users/me")
 def get_me(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     ...
-7. 目录结构
-text
+```
+## 7. 目录结构
+```
 fitagent/
 ├── app/
 │   ├── __init__.py
@@ -471,22 +476,23 @@ fitagent/
 ├── README.md
 ├── requirements.txt
 └── pyproject.toml
-8. 架构决策记录（ADR）
-ADR-1：为什么用四层架构
+```
+## 8. 架构决策记录（ADR）
+### ADR-1：为什么用四层架构
 背景：上一版 main.py 单文件臃肿。
 
 决策：分 API / Service / Agent / Data 四层。
 
 收益：职责清晰、可独立测试、可替换实现。
 
-ADR-2：为什么数据库拆分 users 和 profiles
+### ADR-2：为什么数据库拆分 users 和 profiles
 背景：认证信息和档案信息的变更频率不同，字段性质不同。
 
 决策：拆成 users（认证）+ profiles（档案）。
 
 收益：未来加微信登录、邮箱登录，只改 users 表。
 
-ADR-3：为什么短期对话和长期对话分开存储
+### ADR-3：为什么短期对话和长期对话分开存储
 背景：LangGraph 的 checkpointer 和业务数据是两种不同性质的数据。
 
 决策：
@@ -497,7 +503,7 @@ ADR-3：为什么短期对话和长期对话分开存储
 
 收益：职责分离，checkpointer 可重建，业务数据永久保存。
 
-ADR-4：为什么用 JWT 而不是 Session
+### ADR-4：为什么用 JWT 而不是 Session
 背景：API 服务需要无状态认证。
 
 决策：JWT。

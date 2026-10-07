@@ -12,7 +12,7 @@ User Repository：封装 users 表的数据库操作。
 - 只做数据访问，不做业务判断（如"手机号是否已注册"由 Service 判断）
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -53,5 +53,5 @@ class UserRepository:
 
     def update_last_login(self, user: User) -> None:
         """更新最后登录时间。"""
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = datetime.now(timezone.utc)
         self.db.flush()

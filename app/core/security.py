@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -22,7 +22,7 @@ def create_token(user_id: int) -> str:
     """生成 JWT token。登录成功后返回给前端。"""
     payload = {
         "sub": str(user_id),
-        "exp": datetime.utcnow() + timedelta(hours=settings.jwt_expire_hours),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours),
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
