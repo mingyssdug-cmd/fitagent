@@ -7,18 +7,21 @@ FastAPI 入口。
 - 注册全局异常处理器
 - 初始化日志
 - 配置 CORS
+- 启动时初始化 LangGraph 图
 
 设计：
 - main.py 只做"组装"，不写任何业务逻辑
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1 import auth, chat, plans, users
+from app.agents.graph import close_graph, init_graph
 from app.core.exceptions import AppException
 from app.core.logging import setup_logging
 
@@ -26,11 +29,32 @@ from app.core.logging import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
+# ══════════════════════════════════════════════
+# 生命周期：启动时初始化图，关闭时清理
+# ══════════════════════════════════════════════
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI 生命周期管理。
+
+    启动时调用 init_graph() 初始化 LangGraph 的异步 checkpointer。
+    关闭时调用 close_graph() 释放连接。
+    """
+    logger.info("应用启动，初始化 LangGraph...")
+    await init_graph()
+    logger.info("LangGraph 初始化完成")
+    yield
+    logger.info("应用关闭，清理 LangGraph...")
+    await close_graph()
+
+
 # ── 创建 FastAPI 应用 ──
 app = FastAPI(
     title="FitAgent API",
     description="个人健身助手 Agent",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 

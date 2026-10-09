@@ -8,27 +8,29 @@ LangGraph 编排层。
 - 提供编译后的 app 对象，供 Service 层调用
 
 设计：
-- 短期会话用 SqliteSaver 持久化（中断后重启不丢）
+- 短期会话用 AsyncSqliteSaver 持久化（支持异步，中断后重启不丢）
 - 用 interrupt() 实现 HITL
 - 用 Command(resume=...) 从断点恢复
+- 营养和训练节点并行执行（异步）
 """
 
-import sqlite3
+import logging
+import time
 from pathlib import Path
 from typing import Optional, TypedDict
 
-from langgraph.checkpoint.sqlite import SqliteSaver
+import aiosqlite
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from app.agents.nutrition import nutrition_agent
 from app.agents.workout import workout_agent
 
-# ── SQLite 检查点文件路径 ──
-# 存 LangGraph 的中断状态。放在项目根目录的 data/ 下
-CHECKPOINT_DB = "data/checkpoints.db"
+logger = logging.getLogger(__name__)
 
-# 确保 data/ 目录存在，否则 SQLite 会报 "unable to open database file"
+# ── SQLite 检查点文件路径 ──
+CHECKPOINT_DB = "data/checkpoints.db"
 Path(CHECKPOINT_DB).parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -37,16 +39,7 @@ Path(CHECKPOINT_DB).parent.mkdir(parents=True, exist_ok=True)
 # ══════════════════════════════════════════════
 
 class PlanState(TypedDict):
-    """图的状态。
-
-    字段说明：
-    - user_profile: 用户档案（从 profiles 表读出来的 dict）
-    - goal: 目标（cut/bulk/maintain）
-    - nutrition_plan: 营养计划全文（营养节点写入）
-    - workout_plan: 训练计划全文（训练节点写入）
-    - feedback: 用户反馈（revise 时写入，用于触发重生成）
-    - retry_count: 重试次数（防止无限循环）
-    """
+    """图的状态。"""
     user_profile: dict
     goal: str
     nutrition_plan: Optional[str]
@@ -59,34 +52,35 @@ class PlanState(TypedDict):
 # 节点函数
 # ══════════════════════════════════════════════
 
-def nutrition_node(state: PlanState) -> dict:
-    """营养节点：调用营养 Agent 生成饮食计划。
+async def nutrition_node(state: PlanState) -> dict:
+    """营养节点：调用营养 Agent 生成饮食计划。"""
+    start = time.time()
+    logger.info("[nutrition_node] 开始执行")
 
-    输入：state 里的 user_profile、goal、feedback
-    输出：state 里的 nutrition_plan
-    """
-    # 构造给 Agent 的提示词
     prompt = (
         f"用户档案：{state['user_profile']}\n"
         f"目标：{state['goal']}\n"
     )
-    # 如果有反馈（重生成场景），带上反馈
     if state.get("feedback"):
         prompt += f"\n用户反馈：{state['feedback']}\n请根据反馈调整计划。"
 
     prompt += "\n请生成饮食计划。"
 
-    # 调用营养 Agent
-    result = nutrition_agent.invoke({
+    result = await nutrition_agent.ainvoke({
         "messages": [{"role": "user", "content": prompt}]
     })
 
-    # 返回状态更新（LangGraph 会自动合并到 state）
+    cost = time.time() - start
+    logger.info("[nutrition_node] 耗时 %.2f 秒", cost)
+
     return {"nutrition_plan": result["messages"][-1].content}
 
 
-def workout_node(state: PlanState) -> dict:
+async def workout_node(state: PlanState) -> dict:
     """训练节点：调用训练 Agent 生成训练计划。"""
+    start = time.time()
+    logger.info("[workout_node] 开始执行")
+
     prompt = (
         f"用户档案：{state['user_profile']}\n"
         f"目标：{state['goal']}\n"
@@ -96,52 +90,39 @@ def workout_node(state: PlanState) -> dict:
 
     prompt += "\n请生成训练计划。"
 
-    result = workout_agent.invoke({
+    result = await workout_agent.ainvoke({
         "messages": [{"role": "user", "content": prompt}]
     })
+
+    cost = time.time() - start
+    logger.info("[workout_node] 耗时 %.2f 秒", cost)
 
     return {"workout_plan": result["messages"][-1].content}
 
 
-def review_node(state: PlanState) -> dict:
-    """审核节点：HITL 中断点。
+async def review_node(state: PlanState) -> dict:
+    """审核节点：HITL 中断点。"""
+    logger.info("[review_node] 进入审核节点")
 
-    调用 interrupt() 暂停图执行，返回两份计划给调用方。
-    调用方（Service 层）通过 Command(resume=...) 传入用户的决定。
-
-    返回：
-    - 若用户 approve，返回 {"feedback": None}
-    - 若用户提了意见，返回 {"feedback": 意见}
-    """
-    # 暂停，把当前状态暴露给调用方
     decision = interrupt({
         "nutrition_plan": state["nutrition_plan"],
         "workout_plan": state["workout_plan"],
         "question": "请确认计划。回复 'approve' 通过，或输入修改意见。",
     })
 
-    # 恢复后，decision 是调用方传来的值
     if isinstance(decision, str) and decision.strip().lower() == "approve":
         return {"feedback": None}
 
-    # 不是 approve，视为修改意见
     return {"feedback": decision}
 
 
 def should_continue(state: PlanState) -> str:
-    """条件边：判断审核后往哪走。
-
-    返回值必须是 add_conditional_edges 映射表里的 key。
-    """
-    # 有反馈 → 重生成
+    """条件边：判断审核后往哪走。"""
     if state.get("feedback"):
-        # 重试次数 +1
         state["retry_count"] = state.get("retry_count", 0) + 1
-        # 超过 3 次强制结束（防止无限循环）
         if state["retry_count"] >= 3:
             return "end"
         return "regenerate"
-    # 无反馈 → 结束
     return "end"
 
 
@@ -149,45 +130,64 @@ def should_continue(state: PlanState) -> str:
 # 图组装
 # ══════════════════════════════════════════════
 
-def build_graph():
+def build_graph(checkpointer):
     """组装并编译 LangGraph 应用。
 
-    返回：编译后的图对象，可以 .invoke() 调用
+    参数：
+        checkpointer: 由调用方传入的异步 checkpointer
     """
-    # 1. 创建图
     graph = StateGraph(PlanState)
 
-    # 2. 添加节点
     graph.add_node("nutrition", nutrition_node)
     graph.add_node("workout", workout_node)
     graph.add_node("review", review_node)
 
-    # 3. 添加边
+    # START 分叉到两个节点，异步并行
     graph.add_edge(START, "nutrition")
-    graph.add_edge("nutrition", "workout")
+    graph.add_edge(START, "workout")
+
+    # 两个节点都完成后汇合到 review
+    graph.add_edge("nutrition", "review")
     graph.add_edge("workout", "review")
 
-    # 4. 条件边：审核后的分支
     graph.add_conditional_edges(
         "review",
         should_continue,
         {
-            "regenerate": "nutrition",  # 有反馈 → 回到营养节点重生成
-            "end": END,                 # 无反馈 → 结束
+            "regenerate": "nutrition",
+            "end": END,
         },
     )
 
-    # 5. 创建 SQLite checkpointer
-    # 注意：不用 SqliteSaver.from_conn_string()
-    # 它返回的是上下文管理器，不是 BaseCheckpointSaver 实例
-    # 直接 sqlite3.connect() 构造连接，再传给 SqliteSaver
-    # check_same_thread=False：允许跨线程使用（uvicorn 多线程场景需要）
-    conn = sqlite3.connect(CHECKPOINT_DB, check_same_thread=False)
-    checkpointer = SqliteSaver(conn)
-
-    # 6. 编译
     return graph.compile(checkpointer=checkpointer)
 
 
-# ── 全局单例：编译后的图对象 ──
-graph_app = build_graph()
+# ══════════════════════════════════════════════
+# 全局初始化（FastAPI 启动时调用）
+# ══════════════════════════════════════════════
+
+# 模块级全局变量，由 init_graph() 赋值
+graph_app = None
+
+# 保存连接，防止被 GC
+_db_conn = None
+
+
+async def init_graph():
+    """初始化图。在 FastAPI 启动时调用。"""
+    global graph_app, _db_conn
+
+    _db_conn = await aiosqlite.connect(CHECKPOINT_DB)
+    checkpointer = AsyncSqliteSaver(_db_conn)
+    graph_app = build_graph(checkpointer)
+
+    logger.info("[Graph] 初始化完成")
+
+
+async def close_graph():
+    """关闭图。在 FastAPI 关闭时调用。"""
+    global _db_conn
+    if _db_conn:
+        await _db_conn.close()
+        _db_conn = None
+        logger.info("[Graph] 已关闭")

@@ -11,6 +11,7 @@
 - 临时 plan_id 用 thread_id（格式：user_{id}_plan_{时间戳}）
 - 生成阶段计划不落库，存在 checkpointer
 - 确认后才写入 plans 表
+- 通过 graph_module.graph_app 访问图对象（因为 init_graph() 后才赋值）
 """
 
 import logging
@@ -19,7 +20,7 @@ import time
 from langgraph.types import Command
 from sqlalchemy.orm import Session
 
-from app.agents.graph import graph_app
+from app.agents import graph as graph_module
 from app.core.exceptions import (
     NotFoundError,
     ProfileIncompleteError,
@@ -49,35 +50,19 @@ class PlanService:
         """构造 LangGraph 的 config。"""
         return {"configurable": {"thread_id": thread_id}}
 
-    def generate(self, user_id: int) -> dict:
-        """生成计划。
+    async def generate(self, user_id: int) -> dict:
+        """生成计划。"""
+        logger.info("[PlanService] 收到生成请求: user_id=%s", user_id)
 
-        流程：
-        1. 检查用户档案完整
-        2. 生成 thread_id
-        3. 调用图，跑到 review 中断
-        4. 返回两份计划 + 中断信息
-
-        返回：
-            {
-                "plan_id": thread_id,
-                "status": "pending_review",
-                "nutrition_plan": ...,
-                "workout_plan": ...,
-                "question": ...,
-            }
-        """
-        # 1. 检查用户档案
         profile = self.profile_repo.get_by_user_id(user_id)
         if not profile:
             raise ProfileIncompleteError("请先完善个人档案")
 
-        # 2. 生成 thread_id
         thread_id = self._make_thread_id(user_id)
         config = self._make_config(thread_id)
 
-        # 3. 调用图
-        result = graph_app.invoke(
+        logger.info("[PlanService] 开始调用 LangGraph...")
+        result = await graph_module.graph_app.ainvoke(
             {
                 "user_profile": profile.to_dict(),
                 "goal": profile.goal,
@@ -87,14 +72,11 @@ class PlanService:
             config=config,
         )
 
-        # 4. 提取中断信息
         interrupts = result.get("__interrupt__", [])
         if not interrupts:
-            raise ValidationError("未命中中断点，请检查图配置")
+            raise ValidationError("未命中中断点")
 
         interrupt_value = interrupts[0].value
-
-        logger.info("计划生成完成: user_id=%s thread_id=%s", user_id, thread_id)
 
         return {
             "plan_id": thread_id,
@@ -104,16 +86,8 @@ class PlanService:
             "question": interrupt_value["question"],
         }
 
-    def confirm(self, user_id: int, plan_id: str) -> dict:
-        """确认计划。恢复图执行，落库。
-
-        参数：
-            user_id: 用户 ID（用于校验权限）
-            plan_id: 临时 ID（即 thread_id）
-
-        返回：
-            最终计划的 dict
-        """
+    async def confirm(self, user_id: int, plan_id: str) -> dict:
+        """确认计划。恢复图执行，落库。"""
         # 1. 校验 thread_id 属于这个用户
         if not plan_id.startswith(f"user_{user_id}_plan_"):
             raise ValidationError("无效的 plan_id")
@@ -121,9 +95,12 @@ class PlanService:
         config = self._make_config(plan_id)
 
         # 2. 恢复图执行
-        result = graph_app.invoke(Command(resume="approve"), config=config)
+        result = await graph_module.graph_app.ainvoke(
+            Command(resume="approve"),
+            config=config,
+        )
 
-        # 3. 检查是否又中断了（不应该，approve 应该结束）
+        # 3. 检查是否又中断了
         if result.get("__interrupt__"):
             raise ValidationError("计划确认异常")
 
@@ -152,17 +129,8 @@ class PlanService:
             "created_at": plan.created_at,
         }
 
-    def revise(self, user_id: int, plan_id: str, feedback: str) -> dict:
-        """提交修改意见，触发重生成。
-
-        参数：
-            user_id: 用户 ID
-            plan_id: 临时 ID
-            feedback: 修改意见
-
-        返回：
-            新的中断信息
-        """
+    async def revise(self, user_id: int, plan_id: str, feedback: str) -> dict:
+        """提交修改意见，触发重生成。"""
         if not feedback or not feedback.strip():
             raise ValidationError("反馈不能为空")
 
@@ -172,7 +140,10 @@ class PlanService:
         config = self._make_config(plan_id)
 
         # 恢复图，传反馈
-        result = graph_app.invoke(Command(resume=feedback), config=config)
+        result = await graph_module.graph_app.ainvoke(
+            Command(resume=feedback),
+            config=config,
+        )
 
         # 检查是否又中断
         interrupts = result.get("__interrupt__", [])
@@ -182,7 +153,6 @@ class PlanService:
         interrupt_value = interrupts[0].value
         retry_count = result.get("retry_count", 0)
 
-        # 检查重试次数
         if retry_count >= MAX_RETRY:
             raise ValidationError(f"已达到最大修改次数 {MAX_RETRY}")
 
@@ -224,7 +194,7 @@ class PlanService:
             raise NotFoundError("计划不存在")
 
         if plan.user_id != user_id:
-            raise NotFoundError("计划不存在")  # 不暴露"无权访问"信息，防止枚举
+            raise NotFoundError("计划不存在")
 
         return {
             "plan_id": plan.id,

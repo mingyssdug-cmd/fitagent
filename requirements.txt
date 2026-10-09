@@ -41,3 +41,4 @@ pypdf
 chroma-hnswlib
 
 langgraph-checkpoint-sqlite
+aiosqlite

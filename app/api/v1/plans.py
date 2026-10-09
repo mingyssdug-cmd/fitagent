@@ -33,43 +33,36 @@ router = APIRouter(prefix="/plans", tags=["计划"])
 
 
 @router.post("/generate", response_model=ApiResponse[GeneratePlanData])
-def generate_plan(
+async def generate_plan(                              # ← async
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """生成计划。跑到 HITL 中断点，返回两份计划。"""
     service = PlanService(db)
-    result = service.generate(current_user.id)
-
+    result = await service.generate(current_user.id)  # ← await
     return ApiResponse(data=GeneratePlanData(**result))
 
 
 @router.post("/{plan_id}/confirm", response_model=ApiResponse[ConfirmPlanData])
-def confirm_plan(
+async def confirm_plan(                               # ← async
     plan_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """确认计划。恢复图执行，落库。"""
     service = PlanService(db)
-    result = service.confirm(current_user.id, plan_id)
-
+    result = await service.confirm(current_user.id, plan_id)  # ← await
     return ApiResponse(data=ConfirmPlanData(**result))
 
 
 @router.post("/{plan_id}/revise", response_model=ApiResponse[RevisePlanData])
-def revise_plan(
+async def revise_plan(                                # ← async
     plan_id: str,
     req: RevisePlanRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """提交修改意见，触发重生成。"""
     service = PlanService(db)
-    result = service.revise(current_user.id, plan_id, req.feedback)
-
+    result = await service.revise(current_user.id, plan_id, req.feedback)  # ← await
     return ApiResponse(data=RevisePlanData(**result))
-
 
 @router.get("", response_model=ApiResponse[PaginationData[PlanListItem]])
 def list_plans(
