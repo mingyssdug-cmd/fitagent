@@ -191,3 +191,26 @@ async def close_graph():
         await _db_conn.close()
         _db_conn = None
         logger.info("[Graph] 已关闭")
+
+async def stream_graph(user_profile: dict, goal: str, thread_id: str):
+    """流式执行图，只输出 AI 生成的 token。"""
+    from langchain_core.messages import AIMessageChunk
+
+    config = {"configurable": {"thread_id": thread_id}}
+
+    async for chunk in graph_app.astream(
+        {
+            "user_profile": user_profile,
+            "goal": goal,
+            "feedback": None,
+            "retry_count": 0,
+        },
+        config=config,
+        stream_mode="messages",
+        subgraphs=True,
+        version="v2",
+    ):
+        if chunk["type"] == "messages":
+            msg, metadata = chunk["data"]
+            if isinstance(msg, AIMessageChunk) and msg.content:
+                yield msg.content

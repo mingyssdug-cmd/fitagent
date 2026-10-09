@@ -86,6 +86,25 @@ class PlanService:
             "question": interrupt_value["question"],
         }
 
+    async def generate_stream(self, user_id: int):
+        """流式生成计划。逐 token yield LLM 输出。
+
+        注意：这是异步生成器，不能直接 return，要用 yield。
+        """
+        from app.agents.graph import stream_graph
+
+        profile = self.profile_repo.get_by_user_id(user_id)
+        if not profile:
+            raise ProfileIncompleteError("请先完善个人档案")
+
+        thread_id = self._make_thread_id(user_id)
+
+        async for token in stream_graph(
+                profile.to_dict(),
+                profile.goal,
+                thread_id,
+        ):
+            yield token
     async def confirm(self, user_id: int, plan_id: str) -> dict:
         """确认计划。恢复图执行，落库。"""
         # 1. 校验 thread_id 属于这个用户
@@ -204,3 +223,4 @@ class PlanService:
             "status": plan.status,
             "created_at": plan.created_at,
         }
+

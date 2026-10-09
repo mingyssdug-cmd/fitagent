@@ -13,6 +13,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from starlette.responses import StreamingResponse
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
@@ -41,6 +42,30 @@ async def generate_plan(                              # ← async
     result = await service.generate(current_user.id)  # ← await
     return ApiResponse(data=GeneratePlanData(**result))
 
+@router.post("/generate/stream")
+async def generate_plan_stream(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """流式生成计划。SSE 格式返回。"""
+    service = PlanService(db)
+
+    async def event_stream():
+        try:
+            async for token in service.generate_stream(current_user.id):
+                yield f"data: {token}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: [ERROR] {str(e)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @router.post("/{plan_id}/confirm", response_model=ApiResponse[ConfirmPlanData])
 async def confirm_plan(                               # ← async
