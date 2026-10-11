@@ -1,0 +1,66 @@
+<view class="chat-container">
+  <!-- 消息列表 -->
+  <scroll-view
+    class="message-list"
+    scroll-y
+    scroll-into-view="{{scrollToId}}"
+    scroll-with-animation
+  >
+    <!-- 欢迎语 -->
+    <view wx:if="{{messages.length === 0}}" class="welcome">
+      <view class="welcome-title">FitAgent</view>
+      <view class="welcome-subtitle">你的 AI 健身助手</view>
+      <view class="welcome-tip">聊天提问，或点「一键生成」</view>
+    </view>
+
+    <!-- 消息列表 -->
+    <view
+      wx:for="{{messages}}"
+      wx:key="id"
+      id="msg-{{item.id}}"
+      class="message-item {{item.role}}"
+    >
+      <view class="message-bubble">
+        <text>{{item.content}}</text>
+        <text wx:if="{{item.loading}}" class="cursor">▊</text>
+      </view>
+    </view>
+
+    <view style="height: 20rpx;"></view>
+  </scroll-view>
+
+  <!-- 底部操作区 -->
+  <view class="bottom-area">
+    <!-- 输入框 -->
+    <view class="input-row">
+      <input
+        class="message-input"
+        type="text"
+        placeholder="输入消息..."
+        value="{{inputValue}}"
+        bindinput="onInput"
+        confirm-type="send"
+        bindconfirm="onSend"
+        disabled="{{sending}}"
+      />
+    </view>
+
+    <!-- 按钮行：发送 + 一键生成 -->
+    <view class="btn-row">
+      <button
+        class="action-btn send-btn {{canSend ? 'active' : ''}}"
+        bindtap="onSend"
+        disabled="{{!canSend}}"
+      >
+        发送
+      </button>
+      <button
+        class="action-btn generate-btn"
+        bindtap="onGeneratePlan"
+        disabled="{{sending}}"
+      >
+        ⚡ 一键生成
+      </button>
+    </view>
+  </view>
+</view>

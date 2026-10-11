@@ -1,0 +1,109 @@
+.profile-container {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  padding-bottom: 60rpx;
+}
+
+/* 顶部用户信息 */
+.user-header {
+  background: linear-gradient(135deg, #1aad19, #4cd964);
+  padding: 80rpx 40rpx 60rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #ffffff;
+}
+
+.avatar {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60rpx;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 30rpx;
+}
+
+.user-name {
+  font-size: 40rpx;
+  font-weight: bold;
+  margin-bottom: 12rpx;
+}
+
+.user-phone {
+  font-size: 28rpx;
+  opacity: 0.9;
+}
+
+/* 账号信息 */
+.info-section {
+  background-color: #ffffff;
+  margin: 30rpx 30rpx 0;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.section-title {
+  font-size: 26rpx;
+  color: #999;
+  padding: 30rpx 30rpx 20rpx;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.info-item .label {
+  font-size: 30rpx;
+  color: #666;
+}
+
+.info-item .value {
+  font-size: 30rpx;
+  color: #333;
+}
+
+/* 操作按钮区 */
+.action-section {
+  margin: 40rpx 30rpx 0;
+}
+
+.btn-action {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background-color: #ffffff;
+  color: #333;
+  font-size: 32rpx;
+  border-radius: 12rpx;
+  text-align: center;
+}
+
+.btn-action::after {
+  border: none;
+}
+
+/* 退出按钮 */
+.btn-logout {
+  margin: 20rpx 30rpx 0;
+  width: auto;
+  height: 88rpx;
+  line-height: 88rpx;
+  background-color: #ffffff;
+  color: #e64340;
+  font-size: 32rpx;
+  border-radius: 12rpx;
+  text-align: center;
+}
+
+.btn-logout::after {
+  border: none;
+}

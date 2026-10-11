@@ -1,0 +1,35 @@
+.register-container {
+  padding: 80rpx 60rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
+  background-color: #ffffff;
+}
+
+.register-header {
+  margin-bottom: 80rpx;
+  text-align: center;
+}
+
+.register-header .title {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 16rpx;
+}
+
+.register-header .subtitle {
+  font-size: 28rpx;
+  color: #999;
+}
+
+.register-form {
+  margin-bottom: 40rpx;
+}
+
+.link {
+  color: #1aad19;
+  font-size: 28rpx;
+  text-align: center;
+  margin-top: 40rpx;
+  display: block;
+}

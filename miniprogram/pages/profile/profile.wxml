@@ -1,0 +1,37 @@
+<view class="profile-container">
+  <!-- 顶部用户信息 -->
+  <view class="user-header">
+    <view class="avatar">
+      {{userInfo.name ? userInfo.name[0] : '?'}}
+    </view>
+    <view class="user-name">{{userInfo.name || '未登录'}}</view>
+    <view class="user-phone">{{userInfo.phone || ''}}</view>
+  </view>
+
+  <!-- 账号信息 -->
+  <view class="info-section">
+    <view class="section-title">账号信息</view>
+    <view class="info-item">
+      <text class="label">姓名</text>
+      <text class="value">{{userInfo.name || '-'}}</text>
+    </view>
+    <view class="info-item">
+      <text class="label">手机号</text>
+      <text class="value">{{userInfo.phone || '-'}}</text>
+    </view>
+    <view class="info-item">
+      <text class="label">用户 ID</text>
+      <text class="value">{{userInfo.user_id || '-'}}</text>
+    </view>
+  </view>
+
+  <!-- 操作按钮区 -->
+  <view class="action-section">
+    <button class="btn-action" bindtap="onClearHistory">
+      清空聊天历史
+    </button>
+  </view>
+
+  <!-- 退出登录 -->
+  <button class="btn-logout" bindtap="onLogout">退出登录</button>
+</view>
